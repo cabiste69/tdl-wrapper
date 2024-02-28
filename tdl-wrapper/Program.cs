@@ -12,8 +12,8 @@ public sealed class Program
     {
         Console.WriteLine("hiii");
         string tdlUrl = GetDownloadLink();
-        string tdlPath = GetTdlDownloadPath();
-        await DownloadTdl(tdlUrl, tdlPath);
+        string tdlZipPath = GetTdlDownloadPath(tdlUrl);
+        await DownloadTdl(tdlUrl, tdlZipPath);
         LoginInTdl();
 
         string channel = GetChannelName();
@@ -198,9 +198,9 @@ public sealed class Program
         // return "https://github.com/iyear/tdl/releases/download/v0.16.0/tdl_Linux_64bit.tar.gz";
     }
 
-    private static string GetTdlDownloadPath()
+    private static string GetTdlDownloadPath(string tdlUrl)
     {
-        string path = @"D:\Documents\coding\c-sharp\tdl-wrapper\tdl-wrapper\bin\tdl_Windows_64bit.zip";
+        string path = Path.Combine(Path.GetTempPath() + "/", string.Concat("", tdlUrl.AsSpan(tdlUrl.IndexOf("tdl_"))));
         if (File.Exists(path))
             File.Delete(path);
         return path;
