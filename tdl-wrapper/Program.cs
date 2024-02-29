@@ -15,6 +15,7 @@ public sealed class Program
         string tdlUrl = await GetDownloadLink();
         string tdlZipPath = GetTdlDownloadPath(tdlUrl);
         await DownloadTdl(tdlUrl, tdlZipPath);
+        Console.WriteLine("downloading prerequisites...");
         LoginInTdl();
 
         string[] channels = GetChannelNames();
@@ -105,7 +106,7 @@ public sealed class Program
         while (!isLoggedIn)
         {
             Console.Write("choose a login method 'qr' / 'code': ");
-            string input = Console.ReadLine()!.Trim();
+            string input = Console.ReadLine()!.Trim().ToLower();
 
             if (input != "qr" && input != "code")
             {
@@ -152,11 +153,35 @@ public sealed class Program
                 Console.WriteLine("One of the channel names is not between 5 and 32 letters long!");
                 return false;
             }
-            if (!Regex.Match(input[i], "([A-Z_a-z+0-9])").Success)
+
+            if (!IsValidChannelName(input[i]))
             {
                 Console.WriteLine($"'{input[i]}' has an illegal character! must only contain 'a-z A-Z 0-9 _ +'");
                 return false;
             }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// verifies if a given channel name is valid
+    /// </summary>
+    /// <param name="name">the channel name to check</param>
+    /// <returns></returns>
+    private static bool IsValidChannelName(string name)
+    {
+        // the link of a group starts with a +, other than that it's an illegal character
+        if (name.IndexOf('+') > 0)
+            return false;
+
+        // Fuck regex
+        for (int i = 0; i < name.Length; i++)
+        {
+            char s = name[i];
+
+            //   [A-Z]                      [a-z]                 _          +
+            if ((s < 65 || s > 90) && (s < 97 || s > 122) && s != 95 && s != 43)
+                return false;
         }
         return true;
     }
