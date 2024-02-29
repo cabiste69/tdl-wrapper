@@ -1,6 +1,8 @@
 ﻿using System.Diagnostics;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace tdlWrapper;
@@ -10,27 +12,33 @@ public sealed class Program
     private static string? TdlExec;
     static async Task Main(string[] args)
     {
-        Console.WriteLine("hiii");
-        string tdlUrl = GetDownloadLink();
+        string tdlUrl = await GetDownloadLink();
         string tdlZipPath = GetTdlDownloadPath(tdlUrl);
         await DownloadTdl(tdlUrl, tdlZipPath);
         LoginInTdl();
 
-        string channel = GetChannelName();
+        string[] channels = GetChannelNames();
         int count = GetCount();
         string[] types = GetContentType();
         string downloadPath = GetContentDownloadPath();
 
-        DownloadContent(channel, count, types, downloadPath);
+        DownloadContent(channels, count, types, downloadPath);
     }
 
-    private static void DownloadContent(string channel, int count, string[] types, string downloadPath)
+    private static void DownloadContent(string[] channels, int count, string[] types, string downloadPath)
     {
-        string export = $"chat export -c {channel} -T last -i {count} -f \"split(Media.Name, '.') | last() | lower() in ['{string.Join("','", types)}']\"";
-        string download = $"dl -f tdl-export.json -d \"{downloadPath}\" --skip-same --continue -l 1";
+        string download = $"dl -d \"{downloadPath}\" --skip-same --continue -l 1";
 
-        RunTdl(export);
-        while(!RunTdl(download));
+        for (int i = 0; i < channels.Length; i++)
+        {
+            string jsonExtractName = Path.Combine(Path.GetDirectoryName(TdlExec) + $"/{channels[i]}.json");
+            string export = $"chat export -c {channels[i]} -T last -i {count} -f \"split(Media.Name, '.') | last() | lower() in ['{string.Join("','", types)}']\" -o {jsonExtractName}";
+
+            RunTdl(export);
+
+            download += $" -f {jsonExtractName}";
+        }
+        while (!RunTdl(download)) ;
     }
 
     private static string GetContentDownloadPath()
@@ -108,42 +116,49 @@ public sealed class Program
         }
     }
 
-    private static string GetChannelName()
+    private static string[] GetChannelNames()
     {
-        // a-z 0-9 _
+        // a-z 0-9 _ +
         // min 5 / max 32
 
-        string? name = null;
-        while (name is null)
+        while (true)
         {
-            Console.WriteLine("enter the link / name of the chat: ");
-            string? input = Console.ReadLine();
+            Console.Write("enter the link / name of the chats separated by space: ");
+            string[]? input = Console.ReadLine().Split(' ');
 
             if (!IsChannelNameValid(ref input)) continue;
 
-            name = input;
+            return input!;
         }
-        return name;
     }
 
-    private static bool IsChannelNameValid(ref string? input)
+    private static bool IsChannelNameValid(ref string[]? input)
     {
-        if (input is null)
+        if (input is null || input.Length == 0)
         {
-            Console.WriteLine("must provide a channel / group name");
+            Console.WriteLine("must provide at least one channel / group name!");
             return false;
         }
 
-        input = input.Trim().Replace("https://t.me/", "");
-        if (input.IndexOf('/') > 0) input = input.Remove(input.IndexOf('/'));
-
-        if (input.Length < 5 || input.Length > 32)
+        for (int i = 0; i < input.Length; i++)
         {
-            Console.WriteLine("the channel / group name must be between 5 and 32 letters long");
-            return false;
-        }
+            input[i] = input[i].Trim().Replace("https://t.me/", "");
 
-        return Regex.Match(input, "([A-Z_a-z+0-9])").Success; ;
+            if (input[i].IndexOf('/') > 0)
+                input[i] = input[i].Remove(input[i].IndexOf('/'));
+
+            if (input[i].Length < 5 || input[i].Length > 32)
+            {
+                Console.WriteLine("One of the channel names is not between 5 and 32 letters long!");
+                return false;
+            }
+            if (!Regex.Match(input[i], "([A-Z_a-z+0-9])").Success)
+            {
+                Console.WriteLine($"'{input[i]}' has an illegal character! must only contain 'a-z A-Z 0-9 _ +'");
+                return false;
+            }
+        }
+        return true;
     }
 
     private static async Task DownloadTdl(string tdlUrl, string tdlPath)
@@ -169,15 +184,59 @@ public sealed class Program
         else
         {
             Directory.CreateDirectory(extractPath);
-            // tar -xzf
             RunProcess("tar", "zxf " + tdlPath + " -C " + extractPath);
         }
     }
 
-    private static bool RunTdl(string command)
+    private static async Task<string> GetDownloadLink()
     {
-        return RunProcess(TdlExec!, command);
+        string version = await GetLatestTdlVersion();
+        string assetName = GetTdlAssetName();
+        return $"https://github.com/iyear/tdl/releases/download/{version}/{assetName}";
+        // return "https://github.com/iyear/tdl/releases/download/v0.16.0/tdl_Linux_64bit.tar.gz";
     }
+
+    private static string GetTdlDownloadPath(string tdlUrl)
+    {
+        string path = Path.Combine(Path.GetTempPath() + "/", string.Concat("", tdlUrl.AsSpan(tdlUrl.IndexOf("tdl_"))));
+        if (File.Exists(path))
+            File.Delete(path);
+        return path;
+    }
+
+    private static string GetTdlAssetName()
+    {
+        string name = "tdl_";
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) name += "Windows_";
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) name += "Linux_";
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) name += "MacOS_";
+        else throw new Exception("Unknown OS!");
+
+        name += Arch.GetArchString(RuntimeInformation.OSArchitecture);
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) name += ".zip";
+        else name += ".tar.gz";
+
+        return name;
+    }
+
+    private static async Task<string> GetLatestTdlVersion()
+    {
+        string uri = "https://api.github.com/repos/iyear/tdl/releases/latest";
+        string agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+
+        var client = new HttpClient();
+        client.DefaultRequestHeaders.Add("User-Agent", agent);
+        using HttpResponseMessage response = await client.GetAsync(uri);
+
+        var jsonResponse = await response.Content.ReadAsStringAsync();
+        Root myDeserializedClass = JsonSerializer.Deserialize<Root>(jsonResponse)!;
+
+        return myDeserializedClass.TagName;
+    }
+
+    private static bool RunTdl(string command) => RunProcess(TdlExec!, command);
     private static bool RunProcess(string app, string command)
     {
         bool success = false;
@@ -191,18 +250,11 @@ public sealed class Program
         }
         return success;
     }
+}
 
-    private static string GetDownloadLink()
-    {
-        return "https://github.com/iyear/tdl/releases/download/v0.16.0/tdl_Windows_64bit.zip";
-        // return "https://github.com/iyear/tdl/releases/download/v0.16.0/tdl_Linux_64bit.tar.gz";
-    }
-
-    private static string GetTdlDownloadPath(string tdlUrl)
-    {
-        string path = Path.Combine(Path.GetTempPath() + "/", string.Concat("", tdlUrl.AsSpan(tdlUrl.IndexOf("tdl_"))));
-        if (File.Exists(path))
-            File.Delete(path);
-        return path;
-    }
+// Root myDeserializedClass = JsonSerializer.Deserialize<Root>(myJsonResponse);
+public class Root
+{
+    [JsonPropertyName("tag_name")]
+    public required string TagName { get; set; }
 }
