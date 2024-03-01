@@ -3,7 +3,6 @@ using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 
 namespace tdlWrapper;
 
@@ -12,18 +11,31 @@ public sealed class Program
     private static string? TdlExec;
     static async Task Main(string[] args)
     {
-        string tdlUrl = await GetDownloadLink();
-        string tdlZipPath = GetTdlDownloadPath(tdlUrl);
-        await DownloadTdl(tdlUrl, tdlZipPath);
-        Console.WriteLine("downloading prerequisites...");
-        LoginInTdl();
+        Thread installTdl = new Thread(InstallTdl)
+        {
+            IsBackground = true
+        };
+        installTdl.Start();
 
         string[] channels = GetChannelNames();
         int count = GetCount();
         string[] types = GetContentType();
         string downloadPath = GetContentDownloadPath();
 
+        if (TdlExec is null)
+            Console.WriteLine("Downloading prerequisites...");
+        while (TdlExec is null)
+            Thread.Sleep(500);
+
+        LoginInTdl();
         DownloadContent(channels, count, types, downloadPath);
+    }
+
+    private static async void InstallTdl()
+    {
+        string tdlUrl = await GetDownloadLink();
+        string tdlZipPath = GetTdlDownloadPath(tdlUrl);
+        await DownloadTdl(tdlUrl, tdlZipPath);
     }
 
     private static void DownloadContent(string[] channels, int count, string[] types, string downloadPath)
@@ -46,7 +58,7 @@ public sealed class Program
     {
         while (true)
         {
-            Console.Write("where to save the files?: ");
+            Console.Write("Enter the path where the files should be saved: ");
             string input = Console.ReadLine();
             try
             {
@@ -55,7 +67,7 @@ public sealed class Program
             }
             catch
             {
-                Console.WriteLine("Incorrect path...");
+                Console.WriteLine("The provided path is invalid! please try again.");
                 continue;
             }
         }
@@ -83,21 +95,20 @@ public sealed class Program
 
     private static int GetCount()
     {
-        int count = 0;
-        while (count <= 0)
+        while (true)
         {
-            Console.Write("how many to download? ");
+            Console.Write("Enter the number of files to download: ");
             try
             {
                 int input = Convert.ToInt32(Console.ReadLine());
-                if (input > 0) count = input;
+                if (input > 0) return input;
+                Console.WriteLine("You sure you want to download 0 files?");
             }
             catch
             {
-                Console.WriteLine("you can't do that!!!");
+                Console.WriteLine("You can't do that!!!");
             }
         }
-        return count;
     }
 
     private static void LoginInTdl()
@@ -105,12 +116,12 @@ public sealed class Program
         bool isLoggedIn = false;
         while (!isLoggedIn)
         {
-            Console.Write("choose a login method 'qr' / 'code': ");
+            Console.Write("Choose a login method 'qr' / 'code': ");
             string input = Console.ReadLine()!.Trim().ToLower();
 
             if (input != "qr" && input != "code")
             {
-                Console.WriteLine("invalid input, please try again.");
+                Console.WriteLine("Invalid input! please try again.");
                 continue;
             }
             isLoggedIn = RunTdl("login -T " + input);
@@ -124,7 +135,7 @@ public sealed class Program
 
         while (true)
         {
-            Console.Write("enter the link / name of the chats separated by space: ");
+            Console.Write("Enter the link / name of the chats separated by space: ");
             string[]? input = Console.ReadLine().Split(' ');
 
             if (!IsChannelNameValid(ref input)) continue;
@@ -137,7 +148,7 @@ public sealed class Program
     {
         if (input is null || input.Length == 0)
         {
-            Console.WriteLine("must provide at least one channel / group name!");
+            Console.WriteLine("You must provide at least one channel / group name!");
             return false;
         }
 
