@@ -9,9 +9,9 @@ namespace tdlWrapper;
 public sealed class Program
 {
     private static string? TdlExec;
-    static async Task Main(string[] args)
+    static void Main()
     {
-        Thread installTdl = new Thread(InstallTdl)
+        Thread installTdl = new(InstallTdl)
         {
             IsBackground = true
         };
@@ -40,18 +40,20 @@ public sealed class Program
 
     private static void DownloadContent(string[] channels, int count, string[] types, string downloadPath)
     {
-        string download = $"dl -d \"{downloadPath}\" --skip-same --continue -l 1";
+        string download = $"dl --skip-same --continue -l 1 -d ";
 
         for (int i = 0; i < channels.Length; i++)
         {
-            string jsonExtractName = Path.Combine(Path.GetDirectoryName(TdlExec) + $"/{channels[i]}.json");
+            string jsonExtractName = Path.Combine(Path.GetDirectoryName(TdlExec)!, $"{channels[i]}.json");
             string export = $"chat export -c {channels[i]} -T last -i {count} -f \"split(Media.Name, '.') | last() | lower() in ['{string.Join("','", types)}']\" -o {jsonExtractName}";
 
             RunTdl(export);
 
-            download += $" -f {jsonExtractName}";
+            string dlCommand = download + Path.Combine(downloadPath, channels[i]) + $" -f \"{jsonExtractName}\"";
+
+            // when downloading a lot of files (100+) tdl might crash, so we throw it in while loop until it finishes
+            while (!RunTdl(dlCommand)) ;
         }
-        while (!RunTdl(download)) ;
     }
 
     private static string GetContentDownloadPath()
@@ -59,7 +61,7 @@ public sealed class Program
         while (true)
         {
             Console.Write("Enter the path where the files should be saved: ");
-            string input = Console.ReadLine();
+            string input = Console.ReadLine()!;
             try
             {
                 var dir = Directory.CreateDirectory(input);
@@ -77,7 +79,7 @@ public sealed class Program
     {
         Console.Write("Enter the extensions of the files to download separated by space (default: mp4): ");
 
-        List<string> input = Console.ReadLine().Trim().Replace('.', '\0').Split(' ').ToList();
+        List<string> input = Console.ReadLine()!.Trim().Replace('.', '\0').Split(' ').ToList();
 
         for (int i = 0; i < input.Count; i++)
         {
@@ -136,7 +138,7 @@ public sealed class Program
         while (true)
         {
             Console.Write("Enter the link / name of the chats separated by space: ");
-            string[]? input = Console.ReadLine().Split(' ');
+            string[]? input = Console.ReadLine()!.Split(' ');
 
             if (!IsChannelNameValid(ref input)) continue;
 
@@ -203,11 +205,11 @@ public sealed class Program
         var x = await client.GetByteArrayAsync(tdlUrl);
         File.WriteAllBytes(tdlPath, x);
 
-        string extractPath = Path.Combine(Path.GetDirectoryName(tdlPath) + "/tdl");
+        string extractPath = Path.Combine(Path.GetDirectoryName(tdlPath)!, "tdl");
         if (Path.Exists(extractPath))
             Directory.Delete(extractPath, true);
 
-        TdlExec = Path.Combine(extractPath + "/tdl");
+        TdlExec = Path.Combine(extractPath, "tdl");
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
@@ -234,7 +236,7 @@ public sealed class Program
 
     private static string GetTdlDownloadPath(string tdlUrl)
     {
-        string path = Path.Combine(Path.GetTempPath() + "/", string.Concat("", tdlUrl.AsSpan(tdlUrl.IndexOf("tdl_"))));
+        string path = Path.Combine(Path.GetTempPath(), string.Concat("", tdlUrl.AsSpan(tdlUrl.IndexOf("tdl_"))));
         if (File.Exists(path))
             File.Delete(path);
         return path;
