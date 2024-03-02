@@ -115,6 +115,11 @@ public sealed class Program
 
     private static void LoginInTdl()
     {
+        // C:\Users\%user%\.tdl\data
+        string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".tdl", "data");
+        if (File.Exists(dataFile))
+            return;
+
         bool isLoggedIn = false;
         while (!isLoggedIn)
         {
