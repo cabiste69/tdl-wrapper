@@ -1,8 +1,6 @@
 ﻿using System.Diagnostics;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace tdlWrapper;
 
@@ -235,8 +233,8 @@ public sealed class Program
     {
         string version = await GetLatestTdlVersion();
         string assetName = GetTdlAssetName();
+        // https://github.com/iyear/tdl/releases/download/v0.16.1/tdl_Windows_64bit.zip
         return $"https://github.com/iyear/tdl/releases/download/{version}/{assetName}";
-        // return "https://github.com/iyear/tdl/releases/download/v0.16.0/tdl_Linux_64bit.tar.gz";
     }
 
     private static string GetTdlDownloadPath(string tdlUrl)
@@ -274,9 +272,7 @@ public sealed class Program
         using HttpResponseMessage response = await client.GetAsync(uri);
 
         var jsonResponse = await response.Content.ReadAsStringAsync();
-        Root myDeserializedClass = JsonSerializer.Deserialize<Root>(jsonResponse)!;
-
-        return myDeserializedClass.TagName;
+        return GetJsonValueByProperty(jsonResponse, "tag_name");
     }
 
     private static bool RunTdl(string command) => RunProcess(TdlExec!, command);
@@ -293,11 +289,11 @@ public sealed class Program
         }
         return success;
     }
-}
 
-// Root myDeserializedClass = JsonSerializer.Deserialize<Root>(myJsonResponse);
-public class Root
-{
-    [JsonPropertyName("tag_name")]
-    public required string TagName { get; set; }
+    private static string GetJsonValueByProperty(string json, string property)
+    {
+        int propIndex = json.IndexOf(property, StringComparison.OrdinalIgnoreCase) + property.Length;
+        string value = json.Substring(propIndex+2, json.IndexOf(',', propIndex) - (propIndex+2)).Trim(); // ": "v0.16.1"
+        return value.Trim('"');
+    }
 }
