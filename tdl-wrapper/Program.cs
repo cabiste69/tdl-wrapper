@@ -113,8 +113,8 @@ public sealed class Program
 
     private static void LoginInTdl()
     {
-        // C:\Users\%user%\.tdl\data
-        string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".tdl", "data");
+        // C:\Users\%user%\.tdl\data\default
+        string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".tdl", "data", "default");
         if (File.Exists(dataFile))
             return;
 
