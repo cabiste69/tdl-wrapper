@@ -141,7 +141,7 @@ public sealed class Program
         while (true)
         {
             Console.Write("Enter the link / name of the chats separated by space: ");
-            string[]? input = Console.ReadLine()!.Split(' ');
+            string[]? input = Console.ReadLine()!.Trim().Split(' ');
 
             if (!IsChannelNameValid(ref input)) continue;
 
@@ -195,8 +195,8 @@ public sealed class Program
         {
             char s = name[i];
 
-            //   [A-Z]                      [a-z]                 _          +
-            if ((s < 65 || s > 90) && (s < 97 || s > 122) && s != 95 && s != 43)
+            //   [A-Z]                      [a-z]                  [0-9]                _          +
+            if ((s < 65 || s > 90) && (s < 97 || s > 122) && (s < 48 || s > 57) && s != 95 && s != 43)
                 return false;
         }
         return true;
