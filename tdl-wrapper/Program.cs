@@ -113,12 +113,10 @@ public sealed class Program
 
     private static void LoginInTdl()
     {
-        // C:\Users\%user%\.tdl\data\default
-        string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".tdl", "data", "default");
-        if (File.Exists(dataFile))
+        bool isLoggedIn = RunTdl("chat ls -f \"len(Topics)<0\"", true);
+        if (isLoggedIn)
             return;
 
-        bool isLoggedIn = false;
         while (!isLoggedIn)
         {
             Console.Write("Choose a login method 'qr' / 'code': ");
@@ -275,14 +273,15 @@ public sealed class Program
         return GetJsonValueByProperty(jsonResponse, "tag_name");
     }
 
-    private static bool RunTdl(string command) => RunProcess(TdlExec!, command);
-    private static bool RunProcess(string app, string command)
+    private static bool RunTdl(string command, bool IsHidden = false) => RunProcess(TdlExec!, command, IsHidden);
+    private static bool RunProcess(string app, string command, bool IsHidden = false)
     {
         bool success = false;
         using (Process process = new())
         {
             process.StartInfo.FileName = app;
             process.StartInfo.Arguments = command;
+            process.StartInfo.RedirectStandardOutput = IsHidden;
             process.Start();
             process.WaitForExit();
             success = process.ExitCode == 0;
