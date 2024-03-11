@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 
 namespace tdlWrapper;
 
-public sealed class Program
+public sealed class Program : WriteFunctions
 {
     private static string? TdlExec;
     static void Main()
@@ -21,7 +21,7 @@ public sealed class Program
         string downloadPath = GetContentDownloadPath();
 
         if (TdlExec is null)
-            Console.WriteLine("Downloading prerequisites...");
+            WriteWarning("Downloading prerequisites...");
         while (TdlExec is null)
             Thread.Sleep(500);
 
@@ -67,7 +67,7 @@ public sealed class Program
             }
             catch
             {
-                Console.WriteLine("The provided path is invalid! please try again.");
+                WriteError("The provided path is invalid! please try again.");
                 continue;
             }
         }
@@ -102,11 +102,11 @@ public sealed class Program
             {
                 int input = Convert.ToInt32(Console.ReadLine());
                 if (input > 0) return input;
-                Console.WriteLine("You sure you want to download 0 files?");
+                WriteWarning("You sure you want to download 0 files?");
             }
             catch
             {
-                Console.WriteLine("You can't do that!!!");
+                WriteError("You can't do that!!!");
             }
         }
     }
@@ -124,7 +124,7 @@ public sealed class Program
 
             if (input != "qr" && input != "code")
             {
-                Console.WriteLine("Invalid input! please try again.");
+                WriteError("Invalid input! please try again.");
                 continue;
             }
             isLoggedIn = RunTdl("login -T " + input);
@@ -151,7 +151,7 @@ public sealed class Program
     {
         if (input is null || input.Length == 0)
         {
-            Console.WriteLine("You must provide at least one channel / group name!");
+            WriteError("You must provide at least one channel / group name!");
             return false;
         }
 
@@ -164,13 +164,13 @@ public sealed class Program
 
             if (input[i].Length < 5 || input[i].Length > 32)
             {
-                Console.WriteLine("One of the channel names is not between 5 and 32 letters long!");
+                WriteError("One of the channel names is not between 5 and 32 characters long!");
                 return false;
             }
 
             if (!IsValidChannelName(input[i]))
             {
-                Console.WriteLine($"'{input[i]}' has an illegal character! must only contain 'a-z A-Z 0-9 _ +'");
+                WriteError($"'{input[i]}' has an illegal character! must only contain 'a-z A-Z 0-9 _ +'");
                 return false;
             }
         }
